@@ -56,9 +56,10 @@ namespace MoneyReckoner
             txtLog.Text += log + Environment.NewLine;
         }
 
-        private void cmdWeeklySummaries_Click(object sender, EventArgs e)
+        private void cmdSummaries_Click(object sender, EventArgs e)
         {
             Data.GenerateWeeklySummaries();
+            Data.GenerateMonthlySummaries();
             Data.SummariesToLog();
         }
 
@@ -88,6 +89,11 @@ namespace MoneyReckoner
         }
 
         private void cmdClearLog_Click(object sender, EventArgs e)
+        {
+            ClearLog();
+        }
+
+        public void ClearLog()
         {
             txtLog.Clear();
         }

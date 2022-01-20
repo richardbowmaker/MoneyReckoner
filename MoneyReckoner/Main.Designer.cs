@@ -33,7 +33,7 @@ namespace MoneyReckoner
             this.chkCashPlus = new System.Windows.Forms.CheckBox();
             this.txtLog = new System.Windows.Forms.TextBox();
             this.chkSantanderCredit = new System.Windows.Forms.CheckBox();
-            this.cmdWeeklySummaries = new System.Windows.Forms.Button();
+            this.cmdSummaries = new System.Windows.Forms.Button();
             this.cmdSave = new System.Windows.Forms.Button();
             this.cmdLoad = new System.Windows.Forms.Button();
             this.cmdClearStatement = new System.Windows.Forms.Button();
@@ -79,15 +79,15 @@ namespace MoneyReckoner
             this.chkSantanderCredit.Text = "Santander Credit Card";
             this.chkSantanderCredit.UseVisualStyleBackColor = true;
             // 
-            // cmdWeeklySummaries
+            // cmdSummaries
             // 
-            this.cmdWeeklySummaries.Location = new System.Drawing.Point(351, 40);
-            this.cmdWeeklySummaries.Name = "cmdWeeklySummaries";
-            this.cmdWeeklySummaries.Size = new System.Drawing.Size(247, 54);
-            this.cmdWeeklySummaries.TabIndex = 4;
-            this.cmdWeeklySummaries.Text = "Show weekly summaries";
-            this.cmdWeeklySummaries.UseVisualStyleBackColor = true;
-            this.cmdWeeklySummaries.Click += new System.EventHandler(this.cmdWeeklySummaries_Click);
+            this.cmdSummaries.Location = new System.Drawing.Point(351, 40);
+            this.cmdSummaries.Name = "cmdSummaries";
+            this.cmdSummaries.Size = new System.Drawing.Size(247, 54);
+            this.cmdSummaries.TabIndex = 4;
+            this.cmdSummaries.Text = "Show summaries";
+            this.cmdSummaries.UseVisualStyleBackColor = true;
+            this.cmdSummaries.Click += new System.EventHandler(this.cmdSummaries_Click);
             // 
             // cmdSave
             // 
@@ -138,7 +138,7 @@ namespace MoneyReckoner
             this.Controls.Add(this.cmdClearStatement);
             this.Controls.Add(this.cmdLoad);
             this.Controls.Add(this.cmdSave);
-            this.Controls.Add(this.cmdWeeklySummaries);
+            this.Controls.Add(this.cmdSummaries);
             this.Controls.Add(this.chkSantanderCredit);
             this.Controls.Add(this.txtLog);
             this.Controls.Add(this.chkCashPlus);
@@ -157,7 +157,7 @@ namespace MoneyReckoner
         private System.Windows.Forms.CheckBox chkCashPlus;
         private System.Windows.Forms.TextBox txtLog;
         private System.Windows.Forms.CheckBox chkSantanderCredit;
-        private System.Windows.Forms.Button cmdWeeklySummaries;
+        private System.Windows.Forms.Button cmdSummaries;
         private System.Windows.Forms.Button cmdSave;
         private System.Windows.Forms.Button cmdLoad;
         private System.Windows.Forms.Button cmdClearStatement;

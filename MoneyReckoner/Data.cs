@@ -8,17 +8,19 @@ namespace MoneyReckoner
     public class Data
     {
         private static List<StatementEntry> _statement = new List<StatementEntry>();
-        private static List<WeeklySummary> _santanderSummaries = new List<WeeklySummary>();
+        private static List<Summary> _weeklySummaries = new List<Summary>();
+        private static List<Summary> _monthlySummaries = new List<Summary>();
 
         public static void Clear()
         {
             _statement.Clear();
-            _santanderSummaries.Clear();
+            _weeklySummaries.Clear();
+            _monthlySummaries.Clear();
         }
 
         public static void Serialise(string filename, bool read)
         {
-            const string title = "Money Reckoner 1.00";
+            const string title = "Money Reckoner 1.10";
 
             if (read)
             {
@@ -53,6 +55,7 @@ namespace MoneyReckoner
             else
             {
                 StreamWriter sw = null;
+                _statement.Sort();
                 try
                 {
                     sw = new StreamWriter(filename);
@@ -119,8 +122,6 @@ namespace MoneyReckoner
                         DateTime dt = DateTime.Parse(line.Substring(0, 10));
                         string[] fields = line.Split(new char[] { '\t' }, StringSplitOptions.None);
 
-                        bool isExcluded = IsExclusion(fields[1]);
-
                         // 0 - date, 1 - description, 2 - credit, 3 - debit, 4 - balance
                         StatementEntry entry;
                         if (fields[2].Length == 0)
@@ -132,8 +133,8 @@ namespace MoneyReckoner
                                 decimal.Parse(fields[4], NumberStyles.Currency),
                                 dt,
                                 fields[1],
-                                CalculateWeekNo(dt),
-                                isExcluded);
+                                CalculateWeekNo(dt)
+                                );
                         }
                         else
                         {
@@ -144,8 +145,7 @@ namespace MoneyReckoner
                                  decimal.Parse(fields[4], NumberStyles.Currency),
                                  dt,
                                  fields[1],
-                                 CalculateWeekNo(dt),
-                                 true);
+                                 CalculateWeekNo(dt));
                         }
 
                         // add entry, avoiding duplicates
@@ -183,8 +183,6 @@ namespace MoneyReckoner
                         string[] fields = line.Split(new char[] { '\t' }, StringSplitOptions.None);
 
                         // 0 - date, 1 - card no, 2 - description, 3 - credit, 4 - debit
-                        bool isExcluded = IsExclusion(fields[2]);
-
                         StatementEntry entry;
                         if (fields[3].Length == 0)
                         {
@@ -195,8 +193,7 @@ namespace MoneyReckoner
                                 0,
                                 dt,
                                 fields[2],
-                                CalculateWeekNo(dt),
-                                isExcluded);
+                                CalculateWeekNo(dt));
                         }
                         else
                         {
@@ -207,8 +204,7 @@ namespace MoneyReckoner
                                 0,
                                 dt,
                                 fields[2],
-                                CalculateWeekNo(dt),
-                                true);
+                                CalculateWeekNo(dt));
                         }
 
                         // add entry, avoiding duplicates
@@ -250,7 +246,6 @@ namespace MoneyReckoner
                         DateTime dt = DateTime.Parse(line.Substring(0, 10));
 
                         string description = lines[++ln];
-                        bool isExcluded = IsExclusion(description);
 
                         // 3 elements = credit, 2 = debit
                         string[] fs = lines[++ln].Split(new char[] { '\t' });
@@ -262,11 +257,10 @@ namespace MoneyReckoner
                             entry = new StatementEntry(
                                     StatementEntry.AccountT.Cashplus,
                                     -decimal.Parse(fs[0], NumberStyles.Currency),
-                                    decimal.Parse(fs[1], NumberStyles.Currency), 
-                                    dt, 
-                                    description, 
-                                    CalculateWeekNo(dt), 
-                                    isExcluded);
+                                    decimal.Parse(fs[1], NumberStyles.Currency),
+                                    dt,
+                                    description,
+                                    CalculateWeekNo(dt));
                         }
                         else
                         {
@@ -277,8 +271,7 @@ namespace MoneyReckoner
                                     decimal.Parse(fs[2], NumberStyles.Currency),
                                     dt,
                                     description,
-                                    CalculateWeekNo(dt),
-                                    isExcluded);
+                                    CalculateWeekNo(dt));
                         }
 
                         // add entry, avoiding duplicates
@@ -304,15 +297,23 @@ namespace MoneyReckoner
 
         public static void SummariesToLog()
         {
-            foreach (WeeklySummary summary in _santanderSummaries)
+            Main.This.ClearLog();
+
+            Main.This.Log("****** Monthly Summaries ******");
+            foreach (Summary summary in _monthlySummaries)
+                Main.This.Log(summary.ToString());
+
+            Main.This.Log("****** Weekly Summaries ******");
+            foreach (Summary summary in _weeklySummaries)
                 Main.This.Log(summary.ToString());
         }
 
         public static void GenerateWeeklySummaries()
         {
+            _statement.Sort(OrderEntriesWeekly);
             int weekNo = 0;
-            _santanderSummaries = new List<WeeklySummary>();
-            WeeklySummary summary = new WeeklySummary();
+            _weeklySummaries = new List<Summary>();
+            Summary summary = new Summary();
 
             foreach (StatementEntry entry in _statement)
             {
@@ -322,14 +323,48 @@ namespace MoneyReckoner
 
                     // save previous summary and start a new one
                     if (!summary.IsEmpty())
-                        _santanderSummaries.Add(summary);
-                    summary = new WeeklySummary(entry.WeekNo);
+                        _weeklySummaries.Add(summary);
+                    summary = new Summary(entry.WeekNo);
                 }
 
-                summary.AddEntry(entry);
+                // credits and excluded items are not included in the
+                // total expenditure
+                summary.AddEntry(entry, (entry.Amount >= 0) || IsWeeklyExclusion(entry));
             }
             if (!summary.IsEmpty())
-                _santanderSummaries.Add(summary);
+                _weeklySummaries.Add(summary);
+        }
+
+        public static void GenerateMonthlySummaries()
+        {
+            _statement.Sort(OrderEntriesMonthly);
+            int month = 0;
+            _monthlySummaries = new List<Summary>();
+            Summary summary = new Summary();
+
+            foreach (StatementEntry entry in _statement)
+            {
+                if (entry.Date.Month != month)
+                {
+                    month = entry.Date.Month;
+
+                    // save previous summary and start a new one
+                    if (!summary.IsEmpty())
+                        _monthlySummaries.Add(summary);
+                    summary = new Summary(entry.Date.Month);
+                }
+
+                // only the santander current account is included in the monthly summary.
+                // credits and excluded items are not included in the total expenditure.
+                bool isExcluded = false;
+                if (entry.Type != StatementEntry.AccountT.SantanderCurrent) isExcluded = true;
+                if (entry.Amount >= 0) isExcluded = true;
+                if (IsMonthlyExclusion(entry)) isExcluded = true;
+
+                summary.AddEntry(entry, isExcluded);
+            }
+            if (!summary.IsEmpty())
+                _monthlySummaries.Add(summary);
         }
 
         // 4 days left in 2015 from last monday
@@ -365,26 +400,78 @@ namespace MoneyReckoner
                 throw new Exception("CalculateWeekNo, invalid year");
         }
 
-        public static bool IsExclusion(string description)
+        public static bool IsWeeklyExclusion(StatementEntry entry)
         {
-            return 
+            return
 
-                // santander current
-                description.Contains("LEEDS BUILDING SOC") ||
-                description.Contains("MANDATE NO 34")      ||  // cashplus
-                description.Contains("EDF ENERGY")         ||
-                description.Contains("WILTSHIRE COUNCIL")  ||
-                description.Contains("BT GROUP PLC")       ||
-                description.Contains("CAMELOT LOTTERY")    ||
-                description.Contains("BRISTOLWESSEXWATER") ||
-                description.Contains("SANTANDERCARDS")     ||
-                description.Contains("WINDOW PAYNE")       ||
+                // santander current account
+                entry.Description.Contains("LEEDS BUILDING SOC")    ||
+                entry.Description.Contains("CASHPLUS")              ||  // cashplus
+                entry.Description.Contains("EDF ENERGY")            ||
+                entry.Description.Contains("WILTSHIRE COUNCIL")     ||
+                entry.Description.Contains("BT GROUP PLC")          ||
+                entry.Description.Contains("CAMELOT LOTTERY")       ||
+                entry.Description.Contains("BRISTOLWESSEXWATER")    ||
+                entry.Description.Contains("SANTANDERCARDS")        ||
+                entry.Description.Contains("WINDOW PAYNE")          ||
 
-                // santander credit
-                description.Contains("INITIAL BALANCE");
+                 // santander credit
+                 entry.Description.Contains("INITIAL BALANCE");
+        }
+        public static bool IsMonthlyExclusion(StatementEntry entry)
+        {
+            return false;
+        }
+
+        public static int OrderEntriesMonthly(StatementEntry e1, StatementEntry e2)
+        {
+            // order by year, month, type of account, day of month, original statement order
+            if (e1.Date.Year < e2.Date.Year) return -1;
+            if (e1.Date.Year > e2.Date.Year) return 1;
+
+            if (e1.Date.Month < e2.Date.Month) return -1;
+            if (e1.Date.Month > e2.Date.Month) return 1;
+
+            if (e1.Type == StatementEntry.AccountT.SantanderCurrent &&
+                e2.Type != StatementEntry.AccountT.SantanderCurrent) return -1;
+
+            if (e1.Type != StatementEntry.AccountT.SantanderCurrent &&
+                e2.Type == StatementEntry.AccountT.SantanderCurrent) return 1;
+
+            if (e1.Type < e2.Type) return -1;
+            if (e1.Type > e2.Type) return 1;
+
+            if (e1.Date.Day < e2.Date.Day) return -1;
+            if (e1.Date.Day > e2.Date.Day) return 1;
+
+            if (e1.Type == StatementEntry.AccountT.SantanderCurrent)
+                // reverse the order of entries, they appear newest first
+                // in the current account statement
+                return e2.Id.CompareTo(e1.Id);
+            else
+                return e1.Id.CompareTo(e2.Id);
+        }
+        public static int OrderEntriesWeekly(StatementEntry e1, StatementEntry e2)
+        {
+            if (e1.WeekNo != e2.WeekNo) return e1.WeekNo.CompareTo(e2.WeekNo);
+
+            if (e1.Type != e2.Type) return e1.Type.CompareTo(e2.Type);
+
+            // the same entry
+            if (e1.Date == e2.Date && e1.Amount == e2.Amount && e1.Balance == e2.Balance) return 0;
+
+            if (e1.Date < e2.Date) return -1;
+            if (e1.Date > e2.Date) return 1;
+
+            if (e1.Type == StatementEntry.AccountT.SantanderCurrent)
+                // reverse the order of entries, they appear newest first
+                // in the current account statement
+                return e2.Id.CompareTo(e1.Id);
+            else
+                return e1.Id.CompareTo(e2.Id);
         }
     }
- 
+
     public class StatementEntry : IComparable
     {
         private static int nextId = 0;
@@ -403,9 +490,8 @@ namespace MoneyReckoner
         public int Id;
         public string Description;
         public int WeekNo;      // week no starting from first monday in year 2015, jan 5th
-        public bool IsExcluded;
 
-        public StatementEntry(AccountT type, decimal amount, decimal balance, DateTime date, string description, int weekNo, bool isExcluded)
+        public StatementEntry(AccountT type, decimal amount, decimal balance, DateTime date, string description, int weekNo)
         {
             Type = type;
             Amount = amount;
@@ -414,11 +500,6 @@ namespace MoneyReckoner
             Id = nextId++;
             Description = description;
             WeekNo = weekNo;
-
-            if (Amount < 0)
-                IsExcluded = isExcluded;
-            else
-                IsExcluded = true; // a credit is excluded
         }
 
         public StatementEntry(string s)
@@ -428,9 +509,7 @@ namespace MoneyReckoner
 
         public override string ToString()
         {
-            string s;
-
-            if (IsExcluded) s = "  "; else s = "* ";
+            string s = "";
 
             switch (Type)
             {
@@ -453,12 +532,11 @@ namespace MoneyReckoner
 
         public void FromString(string s)
         {
-            // "* Cashplus, -1.1, 44.43, Mon 27/12/2021, 364, 19, Fin: MIPERMIT,UNIT 7 CALLOW HI,CHIPPENHA"	
+            // "Cashplus, -1.1, 44.43, Mon 27/12/2021, 364, 19, Fin: MIPERMIT,UNIT 7 CALLOW HI,CHIPPENHA"	
 
             try
             {
-                IsExcluded = !s.StartsWith("*");
-                string[] ts = s.Substring(2).Split(new char[] { ',' });
+                string[] ts = s.Split(new char[] { ',' });
 
                 if (ts[0] == "Santander Current Account") Type = AccountT.SantanderCurrent;
                 if (ts[0] == "Santander Credit Card") Type = AccountT.SantanderCredit;
@@ -469,7 +547,7 @@ namespace MoneyReckoner
                 Date = DateTime.Parse(ts[3].Substring(5));
                 WeekNo = Convert.ToInt32(ts[4]);
                 Id = Convert.ToInt32(ts[5]);
-                Description = ts[6];
+                Description = ts[6].Trim();
             }
             catch (Exception e)
             {
@@ -479,24 +557,7 @@ namespace MoneyReckoner
 
         public int CompareTo(object obj)
         {
-            StatementEntry other = (StatementEntry)obj;
-
-            if (WeekNo != other.WeekNo) return WeekNo.CompareTo(other.WeekNo);
-
-            if (Type != other.Type) return Type.CompareTo(other.Type);
-
-            // the same entry
-            if (Date == other.Date && Amount == other.Amount && Balance == other.Balance) return 0;
-
-            if (Date < other.Date) return -1;
-            if (Date > other.Date) return 1;
-
-            if (Type == AccountT.SantanderCurrent)
-                // reverse the order of entries, they appear newest first
-                // in the current account statement
-                return other.Id.CompareTo(Id);
-            else
-                return Id.CompareTo(other.Id);
+            return Data.OrderEntriesWeekly(this, (StatementEntry)obj);
         }
 
         public bool IsDebit()
@@ -504,35 +565,59 @@ namespace MoneyReckoner
             return Amount <= 0;
         }
     }
- 
-    public class WeeklySummary
+
+    // Statement entries are references from both weekly and monthly statements,
+    // however some entries are included in the mnothly summary but
+    // not the weekly hence the IsIncluded flag differs according to context
+    public class SummaryStatementEntry
     {
+        public StatementEntry Entry;
+        public bool IsIncluded;
+
+        public SummaryStatementEntry(StatementEntry entry, bool isIncluded)
+        {
+            Entry = entry;
+            IsIncluded = isIncluded;
+        }
+
+        public override string ToString()
+        {
+            string s = "";
+
+            if (IsIncluded) s = "* "; else s = "  ";
+            return s + Entry.ToString();
+        }
+    }
+
+    public class Summary
+    {
+        public int Id;  // = week no. for weekly summary, month no. for monthly summary
         public DateTime Date;
-        public int WeekNo;
         public decimal TotalDebits;
-        public List<StatementEntry> Entries;
+        public List<SummaryStatementEntry> Entries;
 
-        public WeeklySummary()
+        public Summary()
         {
             Date = DateTime.MaxValue;
-            WeekNo = 0;
+            Id = 0;
             TotalDebits = 0;
-            Entries = new List<StatementEntry>();
+            Entries = new List<SummaryStatementEntry>();
         }
 
-        public WeeklySummary(int weekNo)
+        public Summary(int id)
         {
             Date = DateTime.MaxValue;
-            WeekNo = weekNo;
+            Id = id;
             TotalDebits = 0;
-            Entries = new List<StatementEntry>();
+            Entries = new List<SummaryStatementEntry>();
         }
 
-        public void AddEntry(StatementEntry entry)
+        public void AddEntry(StatementEntry entry, bool isExcluded)
         {
             if (entry.Date < Date) Date = entry.Date;
-            Entries.Add(entry);
-            if (!entry.IsExcluded)
+            Entries.Add(new SummaryStatementEntry(entry, !isExcluded));
+
+            if (!isExcluded)
                 TotalDebits -= entry.Amount;
         }
 
@@ -545,11 +630,11 @@ namespace MoneyReckoner
         {
             string s = 
                  Date.ToString("ddd dd/M/yyyy", CultureInfo.InvariantCulture) + ", " +
-                 WeekNo.ToString() + ", " +
+                 Id.ToString() + ", " +
                  TotalDebits.ToString("#.##") +
                  Environment.NewLine;
 
-            foreach (StatementEntry entry in Entries)
+            foreach (SummaryStatementEntry entry in Entries)
                 s += "    " + entry.ToString() + Environment.NewLine;
 
             return s;
