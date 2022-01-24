@@ -48,6 +48,7 @@
   <ItemGroup>
     <Compile Include="CaptureClipboard.cs" />
     <Compile Include="Data.cs" />
+    <Compile Include="Logger.cs" />
     <Compile Include="Main.cs">
       <SubType>Form</SubType>
     </Compile>

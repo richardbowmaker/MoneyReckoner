@@ -31,13 +31,13 @@ namespace MoneyReckoner
         {
             this.chkSantanderCurrent = new System.Windows.Forms.CheckBox();
             this.chkCashPlus = new System.Windows.Forms.CheckBox();
-            this.txtLog = new System.Windows.Forms.TextBox();
             this.chkSantanderCredit = new System.Windows.Forms.CheckBox();
             this.cmdSummaries = new System.Windows.Forms.Button();
             this.cmdSave = new System.Windows.Forms.Button();
             this.cmdLoad = new System.Windows.Forms.Button();
             this.cmdClearStatement = new System.Windows.Forms.Button();
             this.cmdClearLog = new System.Windows.Forms.Button();
+            this.lstLogger = new System.Windows.Forms.ListBox();
             this.SuspendLayout();
             // 
             // chkSantanderCurrent
@@ -59,15 +59,6 @@ namespace MoneyReckoner
             this.chkCashPlus.TabIndex = 1;
             this.chkCashPlus.Text = "Cash Plus";
             this.chkCashPlus.UseVisualStyleBackColor = true;
-            // 
-            // txtLog
-            // 
-            this.txtLog.Location = new System.Drawing.Point(43, 271);
-            this.txtLog.Multiline = true;
-            this.txtLog.Name = "txtLog";
-            this.txtLog.ScrollBars = System.Windows.Forms.ScrollBars.Vertical;
-            this.txtLog.Size = new System.Drawing.Size(1743, 829);
-            this.txtLog.TabIndex = 2;
             // 
             // chkSantanderCredit
             // 
@@ -129,22 +120,33 @@ namespace MoneyReckoner
             this.cmdClearLog.UseVisualStyleBackColor = true;
             this.cmdClearLog.Click += new System.EventHandler(this.cmdClearLog_Click);
             // 
+            // lstLogger
+            // 
+            this.lstLogger.FormattingEnabled = true;
+            this.lstLogger.HorizontalScrollbar = true;
+            this.lstLogger.ItemHeight = 20;
+            this.lstLogger.Location = new System.Drawing.Point(43, 281);
+            this.lstLogger.Name = "lstLogger";
+            this.lstLogger.Size = new System.Drawing.Size(1494, 784);
+            this.lstLogger.TabIndex = 9;
+            // 
             // Main
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(9F, 20F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
             this.ClientSize = new System.Drawing.Size(1860, 1134);
+            this.Controls.Add(this.lstLogger);
             this.Controls.Add(this.cmdClearLog);
             this.Controls.Add(this.cmdClearStatement);
             this.Controls.Add(this.cmdLoad);
             this.Controls.Add(this.cmdSave);
             this.Controls.Add(this.cmdSummaries);
             this.Controls.Add(this.chkSantanderCredit);
-            this.Controls.Add(this.txtLog);
             this.Controls.Add(this.chkCashPlus);
             this.Controls.Add(this.chkSantanderCurrent);
             this.Name = "Main";
             this.Text = "Money Reckoner";
+            this.FormClosing += new System.Windows.Forms.FormClosingEventHandler(this.Main_FormClosing);
             this.Load += new System.EventHandler(this.Main_Load);
             this.ResumeLayout(false);
             this.PerformLayout();
@@ -155,13 +157,13 @@ namespace MoneyReckoner
 
         private System.Windows.Forms.CheckBox chkSantanderCurrent;
         private System.Windows.Forms.CheckBox chkCashPlus;
-        private System.Windows.Forms.TextBox txtLog;
         private System.Windows.Forms.CheckBox chkSantanderCredit;
         private System.Windows.Forms.Button cmdSummaries;
         private System.Windows.Forms.Button cmdSave;
         private System.Windows.Forms.Button cmdLoad;
         private System.Windows.Forms.Button cmdClearStatement;
         private System.Windows.Forms.Button cmdClearLog;
+        private System.Windows.Forms.ListBox lstLogger;
     }
 }
 

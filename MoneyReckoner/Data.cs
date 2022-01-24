@@ -8,14 +8,50 @@ namespace MoneyReckoner
     public class Data
     {
         private static List<StatementEntry> _statement = new List<StatementEntry>();
+        private static bool _isDirty = false;
         private static List<Summary> _weeklySummaries = new List<Summary>();
         private static List<Summary> _monthlySummaries = new List<Summary>();
 
+        public static bool IsDirty
+        {
+            get { return _isDirty; }
+        }
+
+        public static int Count
+        {
+            get { return _statement.Count; }
+        }
+
         public static void Clear()
         {
+            _isDirty = true;
             _statement.Clear();
             _weeklySummaries.Clear();
             _monthlySummaries.Clear();
+        }
+
+        public static void AddEntry(StatementEntry entry)
+        {
+            _isDirty = true;
+
+            // add to statement in correct order
+            int n = 0;
+            for (n = 0; n < _statement.Count; ++n)
+            {
+                if (_statement[n].CompareTo(entry) >= 0)
+                {
+                    _statement.Insert(n, entry);
+                    break;
+                }
+            }
+            if (n == _statement.Count)
+                _statement.Add(entry);
+        }
+
+        public static void AddEntries(List<StatementEntry> entries)
+        {
+            foreach (StatementEntry e in entries)
+                AddEntry(e);
         }
 
         public static void Serialise(string filename, bool read)
@@ -32,7 +68,7 @@ namespace MoneyReckoner
 
                     if (s != title)
                     {
-                        Main.This.Log("Invalid file format, " + filename);
+                        Logger.Error("Invalid file format, " + filename);
                         return;
                     }
 
@@ -40,22 +76,22 @@ namespace MoneyReckoner
                     while (!sr.EndOfStream)
                     {
                         StatementEntry entry = new StatementEntry(sr.ReadLine());
-                        _statement.Add(entry);
+                        AddEntry(entry);
                     }
                     sr.Close();
-                    Main.This.Log("Save file read OK, " + filename);
+                    _isDirty = false;
+                    Logger.Info("Save file read OK, " + filename);
                 }
                 catch (Exception e)
                 {
-                    Main.This.Log("Error reading from file: " + filename);
-                    Main.This.Log(e.Message);
+                    Logger.Error("Error reading from file: " + filename);
+                    Logger.Error(e.Message);
                     if (sr != null) sr.Close();
                 }
             }
             else
             {
                 StreamWriter sw = null;
-                _statement.Sort();
                 try
                 {
                     sw = new StreamWriter(filename);
@@ -65,12 +101,12 @@ namespace MoneyReckoner
                         sw.WriteLine(entry.ToString());
 
                     sw.Close();
-                    Main.This.Log("Save file written OK, " + filename);
+                    Logger.Info("Save file written OK, " + filename);
                 }
                 catch (Exception e)
                 {
-                    Main.This.Log("Error writing to file: " + filename);
-                    Main.This.Log(e.Message);
+                    Logger.Error("Error writing to file: " + filename);
+                    Logger.Error(e.Message);
                     if (sw != null) sw.Close();
                 }
             }
@@ -85,19 +121,19 @@ namespace MoneyReckoner
                 if (line.Contains("09-01-28 43377166 - 123 CURRENT ACCOUNT"))
                 {
                     ParseSantanderCurrentStatement(lines);
-                    Main.This.SetSantanderCurrent();
+                    Main._this.SetSantanderCurrent();
                     break;
                 }
                 if (line.Contains("xxxx xxxx xxxx 3878 - SANTANDER 1 2 3 CASHBACK CARD"))
                 {
                     ParseSantanderCreditCardStatement(lines);
-                    Main.This.SetSantanderCredit();
+                    Main._this.SetSantanderCredit();
                     break;
                 }
                 if (line.Contains("CashPlus Online Banking"))
                 {
                     ParseCashPlusStatement(lines);
-                    Main.This.SetCashplus();
+                    Main._this.SetCashplus();
                     break;
                 }
             }
@@ -106,7 +142,8 @@ namespace MoneyReckoner
         public static void ParseSantanderCurrentStatement(string[] lines)
         {
             bool data = false;
-
+            List<StatementEntry> newEntries = new List<StatementEntry>();
+ 
             foreach (string line in lines)
             {
                 if (line == "Date	Description	Money in	Money out	Balance")
@@ -150,7 +187,7 @@ namespace MoneyReckoner
 
                         // add entry, avoiding duplicates
                         if (!_statement.Exists(e => (e.CompareTo(entry) == 0)))
-                            _statement.Add(entry);
+                            newEntries.Add(entry);
 
                     }
                     catch (FormatException)
@@ -159,12 +196,19 @@ namespace MoneyReckoner
                     }
                 }
             }
-            _statement.Sort();
+
+            newEntries.Sort();
+            AddEntries(newEntries);
+
+            // log info about data captured
+            Logger.Info("Santander current account parsed");
+            EntriesSummaryToLogger(newEntries);
         }
 
         public static void ParseSantanderCreditCardStatement(string[] lines)
         {
             bool data = false;
+            List<StatementEntry> newEntries = new List<StatementEntry>();
 
             foreach (string line in lines)
             {
@@ -209,7 +253,7 @@ namespace MoneyReckoner
 
                         // add entry, avoiding duplicates
                         if (!_statement.Exists(e => (e.CompareTo(entry) == 0)))
-                            _statement.Add(entry);
+                            newEntries.Add(entry);
 
                     }
                     catch (FormatException)
@@ -219,12 +263,19 @@ namespace MoneyReckoner
                     }
                 }
             }
-            _statement.Sort();
+
+            newEntries.Sort();
+            AddEntries(newEntries);
+
+            // log info about data captured
+            Logger.Info("Santander credit card parsed");
+            EntriesSummaryToLogger(newEntries);
         }
 
         public static void ParseCashPlusStatement(string[] lines)
         {
             bool data = false;
+            List<StatementEntry> newEntries = new List<StatementEntry>();
             int ln = 0;
 
             while (ln < lines.Length)
@@ -256,8 +307,8 @@ namespace MoneyReckoner
                             // credit
                             entry = new StatementEntry(
                                     StatementEntry.AccountT.Cashplus,
-                                    -decimal.Parse(fs[0], NumberStyles.Currency),
-                                    decimal.Parse(fs[1], NumberStyles.Currency),
+                                    -decimal.Parse(fs[0] + '0', NumberStyles.Currency),
+                                    decimal.Parse(fs[1] + '0', NumberStyles.Currency),
                                     dt,
                                     description,
                                     CalculateWeekNo(dt));
@@ -267,8 +318,8 @@ namespace MoneyReckoner
                             // debit
                             entry = new StatementEntry(
                                     StatementEntry.AccountT.Cashplus,
-                                    decimal.Parse(fs[0], NumberStyles.Currency),
-                                    decimal.Parse(fs[2], NumberStyles.Currency),
+                                    decimal.Parse(fs[0] + '0', NumberStyles.Currency),
+                                    decimal.Parse(fs[2] + '0', NumberStyles.Currency),
                                     dt,
                                     description,
                                     CalculateWeekNo(dt));
@@ -276,7 +327,7 @@ namespace MoneyReckoner
 
                         // add entry, avoiding duplicates
                         if (!_statement.Exists(e => (e.CompareTo(entry) == 0)))
-                            _statement.Add(entry);
+                            newEntries.Add(entry);
 
                     }
                     catch (FormatException)
@@ -286,28 +337,41 @@ namespace MoneyReckoner
                 }
                 ln++;
             }
-            _statement.Sort();
+
+            newEntries.Sort();
+            AddEntries(newEntries);
+
+            // log info about data captured
+            Logger.Info("Cashplus account parsed");
+            EntriesSummaryToLogger(newEntries);
+        }
+
+        public static void StatementSummaryToLog()
+        {
+            Logger.Info("Statement summary");
+            EntriesSummaryToLogger(_statement);
+        }
+
+        private static void EntriesSummaryToLogger(List<StatementEntry> entries)
+        {
+            if (entries.Count == 0)
+                Logger.Info("  No transactions");
+            else
+            {
+                Logger.Info(
+                    "  " + entries.Count.ToString() + " transactions " +
+                    " from " + entries[0].Date.ToString("ddd dd/M/yyyy", CultureInfo.InvariantCulture) +
+                    " to " + entries[entries.Count - 1].Date.ToString("ddd dd/M/yyyy", CultureInfo.InvariantCulture));
+            }
         }
 
         public static void StatementToLog()
         {
             foreach (StatementEntry entry in _statement)
-                Main.This.Log(entry.ToString());
+                Logger.Info(entry.ToString());
         }
 
-        public static void SummariesToLog()
-        {
-            Main.This.ClearLog();
-
-            Main.This.Log("****** Monthly Summaries ******");
-            foreach (Summary summary in _monthlySummaries)
-                Main.This.Log(summary.ToString());
-
-            Main.This.Log("****** Weekly Summaries ******");
-            foreach (Summary summary in _weeklySummaries)
-                Main.This.Log(summary.ToString());
-        }
-
+ 
         public static void GenerateWeeklySummaries()
         {
             _statement.Sort(OrderEntriesWeekly);
@@ -638,6 +702,19 @@ namespace MoneyReckoner
                 s += "    " + entry.ToString() + Environment.NewLine;
 
             return s;
+        }
+
+        public void ToLogger()
+        {
+            string s =
+                 Date.ToString("ddd dd/M/yyyy", CultureInfo.InvariantCulture) + ", " +
+                 Id.ToString() + ", " +
+                 TotalDebits.ToString("#.##");
+
+            Logger.Info(s);
+
+            foreach (SummaryStatementEntry entry in Entries)
+                Logger.Info("    " + entry.ToString());
         }
     }
 }

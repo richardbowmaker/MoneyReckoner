@@ -1,19 +1,19 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Globalization;
 using System.Windows.Forms;
+using System.Diagnostics;
+using System.IO;
 
-// save previous statements
-// add in cash plus
+
 // improve displayed output
 
 namespace MoneyReckoner
 {
-
     public partial class Main : Form
     {
-        public static Main This;
+        public static Main _this;
         private CaptureClipboard _captureClipboard;
+        private string _workingFolder;
+        const string _loadFile = "statement.txt";
 
         public Main()
         {
@@ -22,7 +22,9 @@ namespace MoneyReckoner
 
         private void Main_Load(object sender, EventArgs e)
         {
-            This = this;
+            _this = this;
+            Logger.TheListBox = lstLogger;
+            
             _captureClipboard = new CaptureClipboard();
             _captureClipboard.Initialise(this);
 
@@ -32,35 +34,45 @@ namespace MoneyReckoner
             chkSantanderCurrent.Checked = false;
             chkSantanderCredit.Enabled = false;
             chkSantanderCredit.Checked = false;
+
+            // determine the working directory
+            string cd = Directory.GetCurrentDirectory();
+            if (Debugger.IsAttached)
+            {
+                DirectoryInfo di = Directory.GetParent(cd);
+                di = Directory.GetParent(di.FullName);
+                di = Directory.GetParent(di.FullName);
+                _workingFolder = di.FullName;
+            }
+            else
+            {
+                DirectoryInfo di = Directory.GetParent(cd);
+                _workingFolder = di.FullName;
+            }
+            Logger.Info("Working folder = " + _workingFolder);
+
+            // load curernt statement
+            Data.Serialise(_workingFolder + "\\" + _loadFile, true);
+            Data.StatementSummaryToLog();
         }
 
         public void SetCashplus()
         {
             chkCashPlus.Checked = true;
-            Log("Cash Plus statement");
         }
 
         public void SetSantanderCurrent()
         {
             chkSantanderCurrent.Checked = true;
-            Log("Santander current account statement");
         }
         public void SetSantanderCredit()
         {
             chkSantanderCredit.Checked = true;
-            Log("Santander credit card statement");
-        }
-
-        public void Log(string log)
-        {
-            txtLog.Text += log + Environment.NewLine;
         }
 
         private void cmdSummaries_Click(object sender, EventArgs e)
         {
-            Data.GenerateWeeklySummaries();
-            Data.GenerateMonthlySummaries();
-            Data.SummariesToLog();
+            Data.StatementSummaryToLog();
         }
 
         private void cmdSave_Click(object sender, EventArgs e)
@@ -95,7 +107,26 @@ namespace MoneyReckoner
 
         public void ClearLog()
         {
-            txtLog.Clear();
+            Logger.Clear();
+        }
+
+        private void Main_FormClosing(object sender, FormClosingEventArgs e)
+        {
+            if (!Data.IsDirty || Data.Count == 0) return;
+
+            DialogResult dr = MessageBox.Show("Do you want to save the current statement", "Money Reckoner", MessageBoxButtons.YesNoCancel);
+
+            switch (dr)
+            {
+                case DialogResult.Yes:
+                    Data.Serialise(_workingFolder + "\\" + _loadFile, false);
+                    break;
+                case DialogResult.Cancel:
+                    e.Cancel = true;
+                    break;
+                default:
+                    break;
+            }
         }
     }
 }
